@@ -1,241 +1,150 @@
 "use client";
 
-import type { Message as TMessage } from "ai";
-import { AnimatePresence, motion } from "motion/react";
-import { memo, useCallback, useEffect, useState } from "react";
-import equal from "fast-deep-equal";
-
+import { memo } from "react";
 import { Markdown } from "./markdown";
-import { cn } from "@/lib/utils";
-import {
-  CheckCircle,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  Loader2,
-  PocketKnife,
-  SparklesIcon,
-  StopCircle,
-} from "lucide-react";
-import { SpinnerIcon } from "./icons";
+import { Loader2, Copy, Check } from "lucide-react";
+import { useState, useMemo } from "react";
 
-interface ReasoningPart {
-  type: "reasoning";
-  reasoning: string;
-  details: Array<{ type: "text"; text: string }>;
-}
-
-interface ReasoningMessagePartProps {
-  part: ReasoningPart;
-  isReasoning: boolean;
-}
-
-export function ReasoningMessagePart({
-  part,
-  isReasoning,
-}: ReasoningMessagePartProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  const variants = {
-    collapsed: {
-      height: 0,
-      opacity: 0,
-      marginTop: 0,
-      marginBottom: 0,
-    },
-    expanded: {
-      height: "auto",
-      opacity: 1,
-      marginTop: "1rem",
-      marginBottom: 0,
-    },
+export interface Message {
+  role: "user" | "assistant";
+  content: string;
+  image?: {
+    data: string;
+    mimeType: string;
   };
-
-  const memoizedSetIsExpanded = useCallback((value: boolean) => {
-    setIsExpanded(value);
-  }, []);
-
-  useEffect(() => {
-    memoizedSetIsExpanded(isReasoning);
-  }, [isReasoning, memoizedSetIsExpanded]);
-
-  return (
-    <div className="flex flex-col">
-      {isReasoning ? (
-        <div className="flex flex-row gap-2 items-center">
-          <div className="font-medium text-sm">Reasoning</div>
-          <div className="animate-spin">
-            <SpinnerIcon />
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-row gap-2 items-center">
-          <div className="font-medium text-sm">Reasoned for a few seconds</div>
-          <button
-            className={cn(
-              "cursor-pointer rounded-full dark:hover:bg-zinc-800 hover:bg-zinc-200",
-              {
-                "dark:bg-zinc-800 bg-zinc-200": isExpanded,
-              },
-            )}
-            onClick={() => {
-              setIsExpanded(!isExpanded);
-            }}
-          >
-            {isExpanded ? (
-              <ChevronDownIcon className="h-4 w-4" />
-            ) : (
-              <ChevronUpIcon className="h-4 w-4" />
-            )}
-          </button>
-        </div>
-      )}
-
-      <AnimatePresence initial={false}>
-        {isExpanded && (
-          <motion.div
-            key="reasoning"
-            className="text-sm dark:text-zinc-400 text-zinc-600 flex flex-col gap-4 border-l pl-3 dark:border-zinc-800"
-            initial="collapsed"
-            animate="expanded"
-            exit="collapsed"
-            variants={variants}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-          >
-            {part.details.map((detail, detailIndex) =>
-              detail.type === "text" ? (
-                <Markdown key={detailIndex}>{detail.text}</Markdown>
-              ) : (
-                "<redacted>"
-              ),
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
+  document?: {
+    data: string;
+    mimeType: string;
+    name: string;
+  };
 }
 
-const PurePreviewMessage = ({
-  message,
-  isLatestMessage,
-  status,
-}: {
-  message: TMessage;
-  isLoading: boolean;
-  status: "error" | "submitted" | "streaming" | "ready";
-  isLatestMessage: boolean;
-}) => {
+interface PureMessageProps {
+  message: Message;
+  isLoading?: boolean;
+}
+
+const arePropsEqual = (prevProps: PureMessageProps, nextProps: PureMessageProps) => {
   return (
-    <AnimatePresence key={message.id}>
-      <motion.div
-        className="w-full mx-auto px-4 group/message"
-        initial={{ y: 5, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        key={`message-${message.id}`}
-        data-role={message.role}
-      >
-        <div
-          className={cn(
-            "flex gap-4 w-full group-data-[role=user]/message:ml-auto group-data-[role=user]/message:max-w-2xl",
-            "group-data-[role=user]/message:w-fit",
-          )}
-        >
-          {message.role === "assistant" && (
-            <div className="size-8 flex items-center rounded-full justify-center ring-1 shrink-0 ring-border bg-background">
-              <div className="">
-                <SparklesIcon size={14} />
-              </div>
-            </div>
-          )}
-
-          <div className="flex flex-col w-full space-y-4">
-            {message.parts?.map((part, i) => {
-              switch (part.type) {
-                case "text":
-                  return (
-                    <motion.div
-                      initial={{ y: 5, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      key={`message-${message.id}-part-${i}`}
-                      className="flex flex-row gap-2 items-start w-full pb-4"
-                    >
-                      <div
-                        className={cn("flex flex-col gap-4", {
-                          "bg-secondary text-secondary-foreground px-3 py-2 rounded-tl-xl rounded-tr-xl rounded-bl-xl":
-                            message.role === "user",
-                        })}
-                      >
-                        <Markdown>{part.text}</Markdown>
-                      </div>
-                    </motion.div>
-                  );
-                case "tool-invocation":
-                  const { toolName, state } = part.toolInvocation;
-
-                  return (
-                    <motion.div
-                      initial={{ y: 5, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      key={`message-${message.id}-part-${i}`}
-                      className="flex flex-col gap-2 p-2 mb-3 text-sm bg-zinc-50 dark:bg-zinc-900 rounded-md border border-zinc-200 dark:border-zinc-800"
-                    >
-                      <div className="flex-1 flex items-center justify-center">
-                        <div className="flex items-center justify-center w-8 h-8 bg-zinc-50 dark:bg-zinc-800 rounded-full">
-                          <PocketKnife className="h-4 w-4" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium flex items-baseline gap-2">
-                            {state === "call" ? "Calling" : "Called"}{" "}
-                            <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-md">
-                              {toolName}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="w-5 h-5 flex items-center justify-center">
-                          {state === "call" ? (
-                            isLatestMessage && status !== "ready" ? (
-                              <Loader2 className="animate-spin h-4 w-4 text-zinc-500" />
-                            ) : (
-                              <StopCircle className="h-4 w-4 text-red-500" />
-                            )
-                          ) : state === "result" ? (
-                            <CheckCircle size={14} className="text-green-600" />
-                          ) : null}
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                case "reasoning":
-                  return (
-                    <ReasoningMessagePart
-                      key={`message-${message.id}-${i}`}
-                      // @ts-expect-error part
-                      part={part}
-                      isReasoning={
-                        (message.parts &&
-                          status === "streaming" &&
-                          i === message.parts.length - 1) ??
-                        false
-                      }
-                    />
-                  );
-                default:
-                  return null;
-              }
-            })}
-          </div>
-        </div>
-      </motion.div>
-    </AnimatePresence>
+    prevProps.isLoading === nextProps.isLoading &&
+    prevProps.message.role === nextProps.message.role &&
+    prevProps.message.content === nextProps.message.content &&
+    prevProps.message.image?.data === nextProps.message.image?.data &&
+    prevProps.message.document?.data === nextProps.message.document?.data
   );
 };
 
-export const Message = memo(PurePreviewMessage, (prevProps, nextProps) => {
-  if (prevProps.status !== nextProps.status) return false;
-  if (prevProps.message.annotations !== nextProps.message.annotations)
-    return false;
-  // if (prevProps.message.content !== nextProps.message.content) return false;
-  if (!equal(prevProps.message.parts, nextProps.message.parts)) return false;
+const Message = memo(({ message, isLoading }: PureMessageProps) => {
+  const [copiedLinks, setCopiedLinks] = useState<Record<string, boolean>>({});
 
-  return true;
-});
+  // Memoize the image source to prevent unnecessary recalculations
+  const imageSrc = useMemo(() => {
+    if (!message.image) return null;
+    return `data:${message.image.mimeType};base64,${message.image.data}`;
+  }, [message.image]);
+
+  const handleCopyLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedLinks(prev => ({ ...prev, [url]: true }));
+      setTimeout(() => {
+        setCopiedLinks(prev => ({ ...prev, [url]: false }));
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy link:', err);
+    }
+  };
+
+  // Extract links from content
+  const extractLinks = (content: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const matches = content.match(urlRegex);
+    return matches || [];
+  };
+
+  const links = message.role === "assistant" ? extractLinks(message.content) : [];
+
+  if (message.role === "user") {
+    return (
+      <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg mb-4">
+        <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold flex-shrink-0">
+          U
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="prose prose-sm max-w-none">
+            <Markdown content={message.content} />
+          </div>
+          {imageSrc && (
+            <div className="mt-2 relative">
+              <img
+                src={imageSrc}
+                alt="Uploaded"
+                className="max-w-xs rounded-lg shadow-sm"
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+          )}
+          {message.document && (
+            <div className="mt-2 p-2 bg-gray-100 rounded-md inline-block">
+              <span className="text-sm text-gray-600">{message.document.name}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-start gap-4 p-4 bg-white rounded-lg shadow-sm mb-4">
+      <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white font-semibold flex-shrink-0">
+        AI
+      </div>
+      <div className="flex-1 min-w-0">
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-gray-500">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Thinking...</span>
+          </div>
+        ) : (
+          <>
+            <div className="prose prose-sm max-w-none">
+              <Markdown content={message.content} />
+            </div>
+            {links.length > 0 && (
+              <div className="mt-2 space-y-2">
+                {links.map((link, index) => (
+                  <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
+                    <a 
+                      href={link} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-600 hover:underline truncate flex-1"
+                    >
+                      {link}
+                    </a>
+                    <button
+                      onClick={() => handleCopyLink(link)}
+                      className="p-1 hover:bg-gray-200 rounded-md transition-colors"
+                      title="Copy link"
+                    >
+                      {copiedLinks[link] ? (
+                        <Check className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <Copy className="w-4 h-4 text-gray-500" />
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}, arePropsEqual);
+
+Message.displayName = "Message";
+
+export default Message;
