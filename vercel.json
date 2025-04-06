@@ -1,1 +1,12 @@
-{} 
+{
+  "version": 2,
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install --legacy-peer-deps",
+  "outputDirectory": ".next",
+  "env": {
+    "NEXT_TELEMETRY_DISABLED": "1",
+    "GOOGLE_API_KEY": "AIzaSyC1tq4Xlfa0erUteTFkfaHY0PkeNYn17XI",
+    "NODE_OPTIONS": "--max-old-space-size=4096"
+  }
+} 
