@@ -1,11 +1,12 @@
 "use client";
 
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 import { Button } from "./ui/button";
 import { memo, useState, useEffect } from "react";
 import { useLocation } from "@/lib/hooks/use-location";
 import { LocationTutorial } from "./location-tutorial";
 import { MapPin, Globe } from "lucide-react";
+import { MdChevronRight, MdChevronLeft } from "react-icons/md";
 
 interface SuggestedPromptsProps {
   sendMessage: (input: string) => void;

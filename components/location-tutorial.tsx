@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 import { Button } from "./ui/button";
 import { MapPin, Shield, X, Smartphone, Apple, Computer } from "lucide-react";
 

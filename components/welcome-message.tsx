@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 import { StarIcon, Code, Instagram, MapPin } from "lucide-react";
 import { Button } from "./ui/button";
 import { SuggestedPrompts } from "./suggested-prompts";
